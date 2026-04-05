@@ -1,11 +1,30 @@
-include <chrono>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <numeric>
 #include <vector>
 #include <cstdlib>
+#ifdef _WIN32
+#include <malloc.h>
+#endif
 
 using namespace std;
+
+void *allocate_aligned(size_t alignment, size_t size) {
+#ifdef _WIN32
+  return _aligned_malloc(size, alignment);
+#else
+  return aligned_alloc(alignment, size);
+#endif
+}
+
+void free_aligned(void *ptr) {
+#ifdef _WIN32
+  _aligned_free(ptr);
+#else
+  free(ptr);
+#endif
+}
 
 void multiply_mv_row_major(const double *matrix, int rows, int cols,
                            const double *vector, double *result) {
@@ -257,9 +276,9 @@ int main() {
     int runs = 20;
 
     // mv row major
-    double *mvA_row = (double *)aligned_alloc(64, n * n * sizeof(double));
-    double *mvVec_row = (double *)aligned_alloc(64, n * sizeof(double));
-    double *mvRes_row = (double *)aligned_alloc(64, n * sizeof(double));
+    double *mvA_row = (double *)allocate_aligned(64, n * n * sizeof(double));
+    double *mvVec_row = (double *)allocate_aligned(64, n * sizeof(double));
+    double *mvRes_row = (double *)allocate_aligned(64, n * sizeof(double));
     for (int i = 0; i < n * n; i++)
       mvA_row[i] = 1.0;
     for (int i = 0; i < n; i++)
@@ -270,14 +289,14 @@ int main() {
     volatile double dummy = mvRes_row[0]; // prevent optimization
     (void)dummy; // silence unused variable warning
     cout << n << "x" << n << "\t\t" << mean * 1e6;
-    free(mvA_row);
-    free(mvVec_row);
-    free(mvRes_row);
+    free_aligned(mvA_row);
+    free_aligned(mvVec_row);
+    free_aligned(mvRes_row);
 
     // mv col major
-    double *mvA_col = (double *)aligned_alloc(64, n * n * sizeof(double));
-    double *mvVec_col = (double *)aligned_alloc(64, n * sizeof(double));
-    double *mvRes_col = (double *)aligned_alloc(64, n * sizeof(double));
+    double *mvA_col = (double *)allocate_aligned(64, n * n * sizeof(double));
+    double *mvVec_col = (double *)allocate_aligned(64, n * sizeof(double));
+    double *mvRes_col = (double *)allocate_aligned(64, n * sizeof(double));
     for (int i = 0; i < n * n; i++)
       mvA_col[i] = 1.0;
     for (int i = 0; i < n; i++)
@@ -288,14 +307,14 @@ int main() {
     volatile double dummy2 = mvRes_col[0]; // prevent optimization
     (void)dummy2; // silence unused variable warning
     cout << "\t\t" << mean * 1e6;
-    free(mvA_col);
-    free(mvVec_col);
-    free(mvRes_col);
+    free_aligned(mvA_col);
+    free_aligned(mvVec_col);
+    free_aligned(mvRes_col);
 
     // mm naive
-    double *mmA = (double *)aligned_alloc(64, n * n * sizeof(double));
-    double *mmB = (double *)aligned_alloc(64, n * n * sizeof(double));
-    double *mmRes = (double *)aligned_alloc(64, n * n * sizeof(double));
+    double *mmA = (double *)allocate_aligned(64, n * n * sizeof(double));
+    double *mmB = (double *)allocate_aligned(64, n * n * sizeof(double));
+    double *mmRes = (double *)allocate_aligned(64, n * n * sizeof(double));
     for (int i = 0; i < n * n; i++)
       mmA[i] = mmB[i] = 1.0;
     benchmark([&]() { multiply_mm_naive(mmA, n, n, mmB, n, n, mmRes); }, runs,
@@ -303,14 +322,14 @@ int main() {
     volatile double dummy3 = mmRes[0]; // prevent optimization
     (void)dummy3; // silence unused variable warning
     cout << "\t\t" << mean * 1e6;
-    free(mmA);
-    free(mmB);
-    free(mmRes);
+    free_aligned(mmA);
+    free_aligned(mmB);
+    free_aligned(mmRes);
 
     // mm transposed b
-    double *mmA2 = (double *)aligned_alloc(64, n * n * sizeof(double));
-    double *mmBT = (double *)aligned_alloc(64, n * n * sizeof(double));
-    double *mmRes2 = (double *)aligned_alloc(64, n * n * sizeof(double));
+    double *mmA2 = (double *)allocate_aligned(64, n * n * sizeof(double));
+    double *mmBT = (double *)allocate_aligned(64, n * n * sizeof(double));
+    double *mmRes2 = (double *)allocate_aligned(64, n * n * sizeof(double));
     for (int i = 0; i < n * n; i++)
       mmA2[i] = mmBT[i] = 1.0;
     benchmark(
@@ -319,9 +338,9 @@ int main() {
     volatile double dummy4 = mmRes2[0]; // prevent optimization
     (void)dummy4; // silence unused variable warning
     cout << "\t\t" << mean * 1e6 << "\n";
-    free(mmA2);
-    free(mmBT);
-    free(mmRes2);
+    free_aligned(mmA2);
+    free_aligned(mmBT);
+    free_aligned(mmRes2);
   }
 
   return 0;
